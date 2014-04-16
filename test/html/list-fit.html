@@ -11,41 +11,20 @@
   </head>
 
   <body>
-    <ion-content ng-controller="ContentCtrl" padding="false">
-
-      <ion-refresher on-refresh="onRefresh()" pulling-text="pull!" refreshing-text="refreshing!"></ion-refresher>
-
-      <p>...</p><br/><br/><br/>
-      <p>...</p><br/><br/><br/>
-      <p>...</p><br/><br/><br/>
-      <p>...</p><br/><br/><br/>
-      <p>...</p><br/><br/><br/>
-      <p>...</p><br/><br/><br/>
+    <ion-content ng-controller="MainCtrl">
+      <ul class="list">
+        <li class="item" scroll-collection-repeat="i in items">
+          {{i}}
+        </li>
+      </ul>
     </ion-content>
-
-    <ion-footer-bar class="bar-assertive">
-      <h1 class="title">Footer!</h1>
-    </ion-footer-bar>
-
   <script>
-function ContentCtrl($scope, $timeout) {
-  $scope.onRefresh = function() {
-    $timeout(function() {
-		  $scope.$broadcast('scroll.refreshComplete');
-    }, 1500);
-  };
-  $scope.more = [];
-  $scope.addMore = function() {
-    $timeout(function() {
-      var l = $scope.more.length;
-      for (var i=l; i<l+15; i++) {
-        $scope.more.push(i);
-      }
-      $scope.$broadcast('scroll.infiniteScrollComplete');
-    }, 1500);
-  };
+function MainCtrl($scope) {
+  $scope.items = [];
+  for (var i = 0; i < 20; i++) {
+    $scope.items.push('item '+i);
+  }
 }
   </script>
-
   </body>
 </html>
