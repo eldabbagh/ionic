@@ -20,26 +20,31 @@
     <ion-content>
       <ion-refresher on-refresh="onRefresh()"></ion-refresher>
       <ul class="list">
-        <div class="superrow row" scroll-item-repeat="item in items track by item[0]"
-          scroll-item-size="106">
-          <div class="col card">{{item[0]}}</div>
-          <div class="col card">{{item[1]}}</div>
-          <div class="col card">{{item[2]}}</div>
+        <div class="supercard"
+          scroll-item-repeat="item in items"
+          scroll-item-size="60,60">
+          {{item}}
         </div>
       </ul>
     </ion-content>
   <script>
 function MainCtrl($scope, $ionicScrollDelegate, $timeout) {
   $scope.items = [];
-  for (var i = 0; i < 3000; i+=3) {
-    $scope.items.push([i, i+1, i+2]);
+  for (var i = 0; i < 3000; i++) {
+    $scope.items.push(i);
   }
 
   $scope.onRefresh = function() {
     $timeout(function() {
-      var len = -($scope.items.length * 3);
-      $scope.items.unshift([len, len+1, len+2]);
-      $scope.items.unshift([len+3, len+4, len+5]);
+      var len = $scope.items.length;
+      $scope.items.unshift(2999 - $scope.items.length);
+      $scope.items.unshift(2999 - $scope.items.length);
+      $scope.items.unshift(2999 - $scope.items.length);
+      $scope.items.unshift(2999 - $scope.items.length);
+      $scope.items.unshift(2999 - $scope.items.length);
+      $scope.items.unshift(2999 - $scope.items.length);
+      $scope.items.unshift(2999 - $scope.items.length);
+      $scope.items.unshift(2999 - $scope.items.length);
       $scope.$broadcast('scroll.refreshComplete');
     }, 1500);
   };
@@ -48,19 +53,16 @@ function MainCtrl($scope, $ionicScrollDelegate, $timeout) {
 }
   </script>
   <style>
-div.row.superrow {
+.supercard {
   text-align: center;
+  border: 1px solid #DDD;
   margin: 0;
   padding: 0;
-  font-size: 20px;
-  height: 106px;
+  float: left;
+  line-height: 45px;
+  width: 50px;
+  height: 50px;
+  margin: 5px;
 }
-  .superrow.row .card {
-    text-align: center;
-    box-shadow: none;
-    -webkit-box-shadow: none;
-    border: 1px solid #DDD;
-    line-height: 53px;
-  }
-  </body>
+</body>
 </html>

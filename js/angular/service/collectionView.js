@@ -4,23 +4,23 @@ IonicModule
   '$rootScope',
   '$timeout',
 function($rootScope, $timeout) {
-  var BUFFER_LENGTH = 1;
-  function CollectionView(scrollCtrl, dataSource, itemScrollSize) {
-    this.element = scrollCtrl.$element;
-    this.scrollView = scrollCtrl.scrollView;
+  var BUFFER_SPACES = 2;
+  function CollectionView(options) {
+    this.dataSource = options.dataSource;
+    this.element = options.element;
+    this.scrollView = options.scrollView;
+    this.itemSizePrimary = options.itemSizePrimary;
+    this.itemSizeSecondary = options.itemSizeSecondary;
 
     if (this.scrollView.options.scrollingX && this.scrollView.options.scrollingY) {
-      throw new Error("Cannot create a scrollCollectionView on an element that scrolls both x and y. Choose one, yo!");
+      throw new Error("TODO MOVE THIS ERROR TO THE DIRECTIVE. Cannot create a scrollCollectionView on an element that scrolls both x and y. Choose one, yo!");
     }
-    this.isVertical = !!this.scrollView.options.scrollingY;
-    this.dataSource = dataSource;
 
-    this.lastRenderScrollValue = 0;
-    this.scrollTransformOffset = 0;
-    this.itemScrollSize = itemScrollSize;
+    this.isVertical = !!this.scrollView.options.scrollingY;
     this.renderedItems = [];
 
-    this.bufferStartIndex = this.bufferEndIndex = this.bufferItemsLength = 0;
+    this.lastRenderScrollValue = this.bufferTransformOffset = this.bufferStartIndex =
+      this.bufferEndIndex = this.bufferItemsLength = 0;
 
     this.scrollView.__$callback = this.scrollView.__callback;
     this.scrollView.__callback = angular.bind(this, this.renderScroll);
@@ -33,8 +33,11 @@ function($rootScope, $timeout) {
       this.getScrollMaxValue = function() {
         return this.scrollView.__maxScrollTop;
       };
-      this.getContainerSize = function() {
+      this.getScrollSize = function() {
         return this.scrollView.__clientHeight;
+      };
+      this.getScrollSizeSecondary = function() {
+        return this.scrollView.__clientWidth;
       };
     } else {
       this.scrollView.options.getContentWidth = angular.bind(this, this.getContentSize);
@@ -44,8 +47,11 @@ function($rootScope, $timeout) {
       this.getScrollMaxValue = function() {
         return this.scrollView.__maxScrollLeft;
       };
-      this.getContainerSize = function() {
+      this.getScrollSize = function() {
         return this.scrollView.__clientWidth;
+      };
+      this.getScrollSizeSecondary = function() {
+        return this.scrollView.__clientHeihgt;
       };
     }
     this.scrollView.resize();
@@ -53,7 +59,12 @@ function($rootScope, $timeout) {
 
   CollectionView.prototype = {
     getContentSize: function() {
-      return this.itemScrollSize * this.dataSource.getLength();
+      return this.itemSizePrimary * this.dataSource.getLength() / this.getItemsPerSpace();
+    },
+    getItemsPerSpace: function() {
+      return this.itemSizeSecondary ? 
+        Math.floor(this.getScrollSizeSecondary() / this.itemSizeSecondary) :
+        1;
     },
     renderScroll: ionic.animationFrameThrottle(function(transformLeft, transformTop, zoom, wasResize) {
       if (this.isVertical) {
@@ -65,7 +76,7 @@ function($rootScope, $timeout) {
     }),
     getTransformPosition: function(transformPos) {
       var difference = transformPos - this.lastRenderScrollValue;
-      if (Math.abs(difference - this.scrollTransformOffset) >= this.itemScrollSize) {
+      if (Math.abs(difference - this.bufferTransformOffset) >= this.itemSizePrimary) {
         var scrollValue = this.getScrollValue();
         if (scrollValue >= 0 && scrollValue <= this.getScrollMaxValue()) {
           this.render();
@@ -76,16 +87,16 @@ function($rootScope, $timeout) {
     },
     render: function(shouldRedrawAll) {
       var i;
-      var scrollValue = this.getScrollValue();
-      var viewportStartIndex = Math.floor(scrollValue / this.itemScrollSize);
-      var viewportItemsLength = Math.ceil(this.getContainerSize() / this.itemScrollSize);
-      var viewportEndIndex = viewportStartIndex + viewportItemsLength;
+      var itemsPerSpace = this.getItemsPerSpace();
+      var viewportSpaces = Math.floor(this.getScrollSize() / this.itemSizePrimary);
+      var viewportStartIndex = Math.ceil(this.getScrollValue() / this.itemSizePrimary) *
+        itemsPerSpace;
+      var viewportEndIndex = viewportStartIndex + (viewportSpaces * itemsPerSpace);
 
-      var bufferStartIndex = Math.max(0, viewportStartIndex - BUFFER_LENGTH);
-      var bufferEndIndex = Math.min(this.dataSource.getLength(), viewportEndIndex + BUFFER_LENGTH);
+      var bufferSize = BUFFER_SPACES * itemsPerSpace;
+      var bufferStartIndex = Math.max(0, viewportStartIndex - bufferSize);
+      var bufferEndIndex = Math.min(this.dataSource.getLength(), viewportEndIndex + bufferSize);
       var bufferItemsLength = bufferEndIndex - bufferStartIndex;
-
-      this.scrollTransformOffset = (viewportStartIndex - bufferStartIndex) * this.itemScrollSize;
 
       if (shouldRedrawAll) {
         for (i in this.renderedItems) {
@@ -100,6 +111,7 @@ function($rootScope, $timeout) {
           for (i = bufferStartIndex; i <= bufferEndIndex; i++) {
             this.renderItem(i);
           }
+      console.log(this.bufferTransformOffset);
         //Append new items if scrolling down
         } else if (bufferEndIndex > this.bufferEndIndex) {
           for (i = this.bufferEndIndex + 1; i <= bufferEndIndex; i++) {
@@ -123,7 +135,16 @@ function($rootScope, $timeout) {
       this.bufferStartIndex = bufferStartIndex;
       this.bufferEndIndex = bufferEndIndex;
       this.bufferItemsLength = bufferItemsLength;
-      this.lastRenderScrollValue = this.bufferStartIndex * this.itemScrollSize;
+
+      var bufferLength = viewportStartIndex - this.bufferStartIndex;
+      this.bufferTransformOffset = Math.ceil(bufferLength / itemsPerSpace) *
+        this.itemSizePrimary;
+      this.lastRenderScrollValue = Math.ceil(this.bufferStartIndex / itemsPerSpace) *
+        this.itemSizePrimary;
+
+      console.log('render(). viewportStartIndex =', viewportStartIndex, 
+                  'bufferTransformOffset =', this.bufferTransformOffset,
+                  'scrollValue ', this.lastRenderScrollValue);
 
       if (!this.dataSource.scope.$$phase) {
         this.dataSource.scope.$digest();
@@ -259,6 +280,9 @@ function($cacheFactory, $parse) {
   '$collectionView',
   '$collectionViewDataSource',
 function($collectionView, $collectionViewDataSource) {
+  function itemScrollSizeError(value) {
+    return new Error("scroll-item-repeat expected attribute item-scroll-size to be a number but got '" + value + "'.");
+  }
   return {
     priority: 1000,
     transclude: 'element',
@@ -266,12 +290,16 @@ function($collectionView, $collectionViewDataSource) {
     $$tlb: true,
     require: '^$ionicScroll',
     link: function($scope, $element, $attr, scrollCtrl, $transclude) {
-      if ($attr.scrollItemSize) {
-        $attr.scrollItemSize = $attr.scrollItemSize.replace(/px$/,'');
+      var size = $attr.scrollItemSize;
+      if (!size) {
+        throw itemScrollSizeError(size);
       }
-      var scrollItemSize = parseInt($attr.scrollItemSize, 10);
-      if (!scrollItemSize) {
-        throw new Error("scroll-item-repeat expected attribute item-scroll-size to be a number but got '" + $attr.scrollItemSize + "'.");
+
+      size = size.replace(/px/g,'').replace(/\s/g,'').split(',');
+      var primarySize = parseInt(size[0], 10);
+      var secondarySize = parseInt(size[1], 10);
+      if (!primarySize) {
+        throw itemScrollSizeError(size);
       }
 
       var match = $attr.scrollItemRepeat.match(/^\s*([\s\S]+?)\s+in\s+([\s\S]+?)(?:\s+track\s+by\s+([\s\S]+?))?\s*$/);
@@ -287,7 +315,13 @@ function($collectionView, $collectionViewDataSource) {
         listExpr: match[2],
         trackByExpr: match[3]
       });
-      var collectionView = new $collectionView(scrollCtrl, dataSource, scrollItemSize);
+      var collectionView = new $collectionView({
+        dataSource: dataSource,
+        element: scrollCtrl.$element,
+        scrollView: scrollCtrl.scrollView,
+        itemSizePrimary: primarySize,
+        itemSizeSecondary: secondarySize
+      });
 
       $scope.$watchCollection(dataSource.listExpr, function(value) {
         dataSource.setData(value);
