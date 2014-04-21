@@ -150,45 +150,59 @@ function($rootScope, $timeout) {
 
 .factory('$collectionViewDataSource', [
   '$cacheFactory',
-function($cacheFactory) {
+  '$parse',
+function($cacheFactory, $parse) {
   var nextCacheId = 0;
-  function ItemCache() {
-    this.cache = $cacheFactory(nextCacheId++);
-  }
-  ItemCache.prototype = {
-    put: function(key, value) {
-      return this.cache.put(hashKey(key), value);
-    },
-    get: function(key) {
-      return this.cache.get(hashKey(key));
-    },
-  };
   function CollectionViewDataSource(options) {
-    this.expression = options.expression;
+    var self = this;
     this.scope = options.scope;
     this.transcludeFn = options.transcludeFn;
     this.transcludeParent = options.transcludeParent;
-    this.itemCache = new ItemCache();
 
-    var keys = this.expression.split(/\s+in\s+/);
-    this.keyExpression = keys[0];
-    this.listExpression = keys[1].split(/\s+/)[0];
+    this.keyExpr = options.keyExpr;
+    this.listExpr = options.listExpr;
+    this.trackByExpr = options.trackByExpr;
+
+    if (this.trackByExpr) {
+      var trackByGetter = $parse(this.trackByExpr);
+      var hashFnLocals = {$id: hashKey};
+      this.trackByIdGetter = function(index, value) {
+        hashFnLocals[self.keyExpr] = value;
+        hashFnLocals.$index = index;
+        return trackByGetter(self.scope, hashFnLocals);
+      };
+    } else {
+      this.trackByIdGetter = function(index, value) {
+        return hashKey(value);
+      };
+    }
+
+    var cache = $cacheFactory(nextCacheId++/*, {size: 500}*/);
+    this.itemCache = {
+      put: function(index, value, item) {
+        return cache.put(self.trackByIdGetter(index, value), item);
+      },
+      get: function(index, value) {
+        return cache.get(self.trackByIdGetter(index, value));
+      }
+    };
+
   }
   CollectionViewDataSource.prototype = {
-    compileItem: function(value) {
-      var cachedItem = this.itemCache.get(value);
+    compileItem: function(index, value) {
+      var cachedItem = this.itemCache.get(index, value);
       if (cachedItem) return cachedItem;
 
       var childScope = this.scope.$new();
       var element;
 
-      childScope[this.keyExpression] = value;
+      childScope[this.keyExpr] = value;
 
       this.transcludeFn(childScope, function(clone) {
         element = clone;
       });
 
-      return this.itemCache.put(value, {
+      return this.itemCache.put(index, value, {
         element: element,
         scope: childScope
       });
@@ -197,7 +211,7 @@ function($cacheFactory) {
       if (index >= this.getLength()) return;
 
       var value = this.data[index];
-      var item = this.compileItem(value);
+      var item = this.compileItem(index, value);
 
       if (item.scope.$index !== index) {
         item.scope.$index = item.index = index;
@@ -241,11 +255,10 @@ function($cacheFactory) {
   return CollectionViewDataSource;
 }])
 
-.directive('scrollCollectionRepeat', [
+.directive('scrollItemRepeat', [
   '$collectionView',
   '$collectionViewDataSource',
-  '$compile',
-function($collectionView, $collectionViewDataSource, $compile) {
+function($collectionView, $collectionViewDataSource) {
   return {
     priority: 1000,
     transclude: 'element',
@@ -253,16 +266,30 @@ function($collectionView, $collectionViewDataSource, $compile) {
     $$tlb: true,
     require: '^$ionicScroll',
     link: function($scope, $element, $attr, scrollCtrl, $transclude) {
-      var itemScrollSize = +$attr.scrollItemSize;
+      if ($attr.scrollItemSize) {
+        $attr.scrollItemSize = $attr.scrollItemSize.replace(/px$/,'');
+      }
+      var scrollItemSize = parseInt($attr.scrollItemSize, 10);
+      if (!scrollItemSize) {
+        throw new Error("scroll-item-repeat expected attribute item-scroll-size to be a number but got '" + $attr.scrollItemSize + "'.");
+      }
+
+      var match = $attr.scrollItemRepeat.match(/^\s*([\s\S]+?)\s+in\s+([\s\S]+?)(?:\s+track\s+by\s+([\s\S]+?))?\s*$/);
+      if (!match) {
+        throw new Error("scroll-item-repeat expected expression in form of '_item_ in _collection_[ track by _id_]' but got '" + $attr.scrollItemRepeat + "'.");
+      }
+
       var dataSource = new $collectionViewDataSource({
-        expression: $attr.scrollCollectionRepeat,
         scope: $scope,
         transcludeFn: $transclude,
         transcludeParent: $element.parent(),
+        keyExpr: match[1],
+        listExpr: match[2],
+        trackByExpr: match[3]
       });
-      var collectionView = new $collectionView(scrollCtrl, dataSource, itemScrollSize);
+      var collectionView = new $collectionView(scrollCtrl, dataSource, scrollItemSize);
 
-      $scope.$watchCollection(dataSource.listExpression, function(value) {
+      $scope.$watchCollection(dataSource.listExpr, function(value) {
         dataSource.setData(value);
         scrollCtrl.scrollView.resize();
         collectionView.render(true);

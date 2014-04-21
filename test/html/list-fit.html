@@ -20,7 +20,7 @@
     <ion-content>
       <ion-refresher on-refresh="onRefresh()"></ion-refresher>
       <ul class="list">
-        <div class="superrow row" scroll-collection-repeat="item in items"
+        <div class="superrow row" scroll-item-repeat="item in items track by item[0]"
           scroll-item-size="106">
           <div class="col card">{{item[0]}}</div>
           <div class="col card">{{item[1]}}</div>
