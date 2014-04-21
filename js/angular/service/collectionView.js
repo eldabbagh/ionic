@@ -1,9 +1,3 @@
-/**
- * Components:
- * - DOM Element
- * - Actual list of items
- * - Each element has a corresponding cache with element, scope, and pointer to its corresponding item value
- */
 
 IonicModule
 .factory('$collectionView', [
@@ -43,7 +37,7 @@ function($rootScope, $timeout) {
         return this.scrollView.__clientHeight;
       };
     } else {
-      this.scrollView.options.getContentHeight = angular.bind(this, this.getContentSize);
+      this.scrollView.options.getContentWidth = angular.bind(this, this.getContentSize);
       this.getScrollValue = function() {
         return this.scrollView.__scrollLeft;
       };
@@ -55,8 +49,6 @@ function($rootScope, $timeout) {
       };
     }
     this.scrollView.resize();
-
-    $rootScope.$watchCollection(angular.bind(this, this.dataSource.getData), angular.bind(this, this.render));
   }
 
   CollectionView.prototype = {
@@ -77,12 +69,12 @@ function($rootScope, $timeout) {
         var scrollValue = this.getScrollValue();
         if (scrollValue >= 0 && scrollValue <= this.getScrollMaxValue()) {
           this.render();
-          return (difference % this.itemScrollSize) + this.scrollTransformOffset;
+          return transformPos - this.lastRenderScrollValue;
         }
       }
       return difference;
     },
-    render: function() {
+    render: function(redrawAll) {
       var i;
       var scrollValue = this.getScrollValue();
       var viewportStartIndex = Math.floor(scrollValue / this.itemScrollSize);
@@ -95,28 +87,35 @@ function($rootScope, $timeout) {
 
       this.scrollTransformOffset = (viewportStartIndex - bufferStartIndex) * this.itemScrollSize;
 
-      //If the change in index is bigger than our list size, rerender everything
-      if (bufferEndIndex - this.bufferEndIndex > this.bufferItemsLength) {
+      if (redrawAll) {
+        for (i in this.renderedItems) {
+          this.removeItem(i);
+        }
         for (i = bufferStartIndex; i <= bufferEndIndex; i++) {
           this.renderItem(i);
         }
-      //Append new items if scrolling down
-      } else if (bufferEndIndex > this.bufferEndIndex) {
-        for (i = this.bufferEndIndex + 1; i <= bufferEndIndex; i++) {
-          this.renderItem(i);
+      } else {
+        //If the change in index is bigger than our list size, rerender everything
+        if (bufferEndIndex - this.bufferEndIndex > this.bufferItemsLength) {
+          for (i = bufferStartIndex; i <= bufferEndIndex; i++) {
+            this.renderItem(i);
+          }
+        //Append new items if scrolling down
+        } else if (bufferEndIndex > this.bufferEndIndex) {
+          for (i = this.bufferEndIndex + 1; i <= bufferEndIndex; i++) {
+            this.renderItem(i);
+          }
+        //Prepend new items if scrolling up
+        } else if (bufferStartIndex < this.bufferStartIndex) {
+          for (i = this.bufferStartIndex - 1; i >= bufferStartIndex; i--) {
+            this.renderItem(i, true);
+          }
         }
-      //Prepend new items if scrolling up
-      } else if (bufferStartIndex < this.bufferStartIndex) {
-        for (i = this.bufferStartIndex - 1; i >= bufferStartIndex; i--) {
-          this.renderItem(i, true);
-        }
-      }
-
-      //Detach items that aren't in the new range
-      for (i in this.renderedItems) {
-        if (i < bufferStartIndex ||
-            i > bufferEndIndex) {
-          this.removeItem(i);
+        //Detach items that aren't in the new range
+        for (i in this.renderedItems) {
+          if (i < bufferStartIndex || i > bufferEndIndex) {
+            this.removeItem(i);
+          }
         }
       }
 
@@ -131,7 +130,7 @@ function($rootScope, $timeout) {
       } catch(e) {}
     },
     renderItem: function(dataIndex, shouldPrepend) {
-      var item = this.dataSource.getItemAt(dataIndex); 
+      var item = this.dataSource.getItemAt(dataIndex);
       if (item) {
         this.dataSource.attachItem(item, shouldPrepend);
         this.renderedItems[dataIndex] = item;
@@ -174,9 +173,6 @@ function($cacheFactory) {
     var keys = this.expression.split(/\s+in\s+/);
     this.keyExpression = keys[0];
     this.listExpression = keys[1].split(/\s+/)[0];
-
-    this.scope.$watch(this.listExpression, angular.bind(this, this.dataWatchAction));
-    this.dataWatchAction(this.scope.$eval(this.listExpression));
   }
   CollectionViewDataSource.prototype = {
     compileItem: function(value) {
@@ -213,14 +209,6 @@ function($cacheFactory) {
 
       return item;
     },
-    attachItem: function(item, shouldPrepend) {
-      if (shouldPrepend) {
-        this.transcludeParent[0].insertBefore(item.element[0], this.transcludeParent[0].firstElementChild);
-      } else {
-        this.transcludeParent[0].appendChild(item.element[0]);
-      }
-      reconnectScope(item.scope);
-    },
     detachItem: function(item) {
       //Don't .remove(), that will destroy element data
       for (var i = 0; i < item.element.length; i++) {
@@ -231,17 +219,22 @@ function($cacheFactory) {
       //Don't .$destroy(), just stop watchers and events firing
       disconnectScope(item.scope);
     },
+    attachItem: function(item, shouldPrepend) {
+      if (shouldPrepend) {
+        this.transcludeParent[0].insertBefore(item.element[0], this.transcludeParent[0].firstElementChild);
+      } else {
+        this.transcludeParent[0].appendChild(item.element[0]);
+      }
+      reconnectScope(item.scope);
+    },
     getData: function() {
       return this.data || [];
     },
     getLength: function() {
       return this.data && this.data.length || 0;
     },
-    dataWatchAction: function(newValue, oldValue) {
-      this.data = newValue;
-      // this.data.forEach(function(value, index) {
-      //   this.compileItem(value);
-      // }, this);
+    setData: function(value) {
+      this.data = value;
     },
   };
 
@@ -268,6 +261,12 @@ function($collectionView, $collectionViewDataSource, $compile) {
         transcludeParent: $element.parent(),
       });
       var collectionView = new $collectionView(scrollCtrl, dataSource, itemScrollSize);
+
+      $scope.$watchCollection(dataSource.listExpression, function(value) {
+        dataSource.setData(value);
+        scrollCtrl.scrollView.resize();
+        collectionView.render(true);
+      });
 
       $scope.$on('$destroy'); //TODO
     }

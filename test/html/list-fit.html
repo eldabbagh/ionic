@@ -18,21 +18,32 @@
       </a>
     </ion-header-bar>
     <ion-content>
+      <ion-refresher on-refresh="onRefresh()"></ion-refresher>
       <ul class="list">
-      <div class="superrow row" scroll-collection-repeat="item in items"
-        scroll-item-size="106">
-        <div class="col card">{{item[0]}}</div>
-        <div class="col card">{{item[1]}}</div>
-        <div class="col card">{{item[2]}}</div>
-      </div>
+        <div class="superrow row" scroll-collection-repeat="item in items"
+          scroll-item-size="106">
+          <div class="col card">{{item[0]}}</div>
+          <div class="col card">{{item[1]}}</div>
+          <div class="col card">{{item[2]}}</div>
+        </div>
       </ul>
     </ion-content>
   <script>
-function MainCtrl($scope, $ionicScrollDelegate) {
+function MainCtrl($scope, $ionicScrollDelegate, $timeout) {
   $scope.items = [];
   for (var i = 0; i < 1000; i+=3) {
     $scope.items.push([i, i+1, i+2]);
   }
+
+  $scope.onRefresh = function() {
+    $timeout(function() {
+      var newLen = $scope.items.length + 99;
+      for (var i = $scope.items.length; i < newLen; i+=3) {
+        $scope.items.unshift([i, i+2, i+2]);
+      }
+      $scope.$broadcast('scroll.refreshComplete');
+    }, 1500);
+  };
 
   $scope.scrollBottom = $ionicScrollDelegate.scrollBottom;
 }
