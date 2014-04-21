@@ -74,7 +74,7 @@ function($rootScope, $timeout) {
       }
       return difference;
     },
-    render: function(redrawAll) {
+    render: function(shouldRedrawAll) {
       var i;
       var scrollValue = this.getScrollValue();
       var viewportStartIndex = Math.floor(scrollValue / this.itemScrollSize);
@@ -87,7 +87,7 @@ function($rootScope, $timeout) {
 
       this.scrollTransformOffset = (viewportStartIndex - bufferStartIndex) * this.itemScrollSize;
 
-      if (redrawAll) {
+      if (shouldRedrawAll) {
         for (i in this.renderedItems) {
           this.removeItem(i);
         }
