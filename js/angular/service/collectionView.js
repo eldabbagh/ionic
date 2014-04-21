@@ -4,7 +4,7 @@ IonicModule
   '$rootScope',
   '$timeout',
 function($rootScope, $timeout) {
-  var BUFFER_SPACES = 2;
+  var BUFFER_SPACES = 1;
   function CollectionView(options) {
     this.dataSource = options.dataSource;
     this.element = options.element;
@@ -88,7 +88,7 @@ function($rootScope, $timeout) {
     render: function(shouldRedrawAll) {
       var i;
       var itemsPerSpace = this.getItemsPerSpace();
-      var viewportSpaces = Math.floor(this.getScrollSize() / this.itemSizePrimary);
+      var viewportSpaces = Math.ceil(this.getScrollSize() / this.itemSizePrimary);
       var viewportStartIndex = Math.ceil(this.getScrollValue() / this.itemSizePrimary) *
         itemsPerSpace;
       var viewportEndIndex = viewportStartIndex + (viewportSpaces * itemsPerSpace);
@@ -141,10 +141,6 @@ function($rootScope, $timeout) {
         this.itemSizePrimary;
       this.lastRenderScrollValue = Math.ceil(this.bufferStartIndex / itemsPerSpace) *
         this.itemSizePrimary;
-
-      console.log('render(). viewportStartIndex =', viewportStartIndex, 
-                  'bufferTransformOffset =', this.bufferTransformOffset,
-                  'scrollValue ', this.lastRenderScrollValue);
 
       if (!this.dataSource.scope.$$phase) {
         this.dataSource.scope.$digest();
