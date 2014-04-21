@@ -125,9 +125,9 @@ function($rootScope, $timeout) {
       this.bufferItemsLength = bufferItemsLength;
       this.lastRenderScrollValue = this.bufferStartIndex * this.itemScrollSize;
 
-      try {
+      if (!this.dataSource.scope.$$phase) {
         this.dataSource.scope.$digest();
-      } catch(e) {}
+      }
     },
     renderItem: function(dataIndex, shouldPrepend) {
       var item = this.dataSource.getItemAt(dataIndex);
@@ -324,6 +324,7 @@ function disconnectScope(scope) {
   }
   scope.$$nextSibling = scope.$$prevSibling = null;
 }
+
 function reconnectScope(scope) {
   if (scope.$root === scope) {
     return; // we can't disconnect the root node;
@@ -334,11 +335,11 @@ function reconnectScope(scope) {
   var parent = scope.$parent;
   scope.$$disconnected = false;
   // See Scope.$new for this logic...
-  scope.$$prevSibling = parent.$$scopeTail;
-  if (parent.$$scopeHead) {
-    parent.$$scopeTail.$$nextSibling = scope;
-    parent.$$scopeTail = scope;
+  scope.$$prevSibling = parent.$$childTail;
+  if (parent.$$childHead) {
+    parent.$$childTail.$$nextSibling = scope;
+    parent.$$childTail = scope;
   } else {
-    parent.$$scopeHead = parent.$$scopeTail = scope;
+    parent.$$childHead = parent.$$childTail = scope;
   }
 }

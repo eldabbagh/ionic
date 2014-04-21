@@ -31,16 +31,15 @@
   <script>
 function MainCtrl($scope, $ionicScrollDelegate, $timeout) {
   $scope.items = [];
-  for (var i = 0; i < 1000; i+=3) {
+  for (var i = 0; i < 3000; i+=3) {
     $scope.items.push([i, i+1, i+2]);
   }
 
   $scope.onRefresh = function() {
     $timeout(function() {
-      var newLen = $scope.items.length + 99;
-      for (var i = $scope.items.length; i < newLen; i+=3) {
-        $scope.items.unshift([i, i+2, i+2]);
-      }
+      var len = -($scope.items.length * 3);
+      $scope.items.unshift([len, len+1, len+2]);
+      $scope.items.unshift([len+3, len+4, len+5]);
       $scope.$broadcast('scroll.refreshComplete');
     }, 1500);
   };
